@@ -1,0 +1,38 @@
+
+15-MINUTE CITY DELIVERY SYSTEM - ANALYSIS RESULTS
+================================================
+
+MARKET ANALYSIS:
+• Target: Moderate-scale pilot deployment
+• Daily volume: 550 packages (proof-of-concept scale)
+• Market penetration: 1.5% of Eindhoven delivery market
+• Service area: 3 key neighborhoods (Centrum, Blixembosch, Meerhoven)
+
+OPTIMAL FLEET CONFIGURATION:
+• Total robots needed: 8
+• Total bikes needed: 3
+• Distribution: 3 robots + 1 bikes per hub
+• Expected utilization: 96.2% robots, 86.6% bikes
+
+PEAK DEMAND PATTERNS:
+• Morning peak: 8-10 AM (1.8x normal demand)
+• Lunch surge: 12-1 PM (1.6x normal demand)  
+• Evening peak: 5-7 PM (1.5x normal demand)
+• Off-peak reduction: 70% less demand during night hours
+
+DELIVERY STRATEGY:
+• Same-zone (robots): 70% of deliveries, <1km range
+• Cross-zone (bikes): 20% of deliveries, 3-7km range
+• External integration: 10% from distribution centers
+
+SIMULATION PARAMETERS:
+• Runtime: 840 steps (14 hours, 7 AM to 9 PM)
+• Peak correlation: 0.881 (excellent pattern matching)
+• Service coverage: 800m radius per hub
+• Sustainable transport: 90% of deliveries via eco-friendly vehicles
+
+FILES GENERATED:
+• demand_patterns_analysis.png - Peak demand visualizations
+• peak_analysis_generated_data.png - Data validation charts
+• theoretical_vs_generated_comparison.png - Pattern correlation
+• optimized_simulation_results.csv - Complete simulation metrics
