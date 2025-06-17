@@ -1,6 +1,14 @@
 from mesa import Agent
 from routing import shortest_path_route
 
+def minutes_to_time_string(minutes_since_midnight):
+    """
+    Convert minutes since midnight to HH:MM format.
+    """
+    hours = minutes_since_midnight // 60
+    minutes = minutes_since_midnight % 60
+    return f"{hours:02d}:{minutes:02d}"
+
 class ParcelAgent(Agent):
     """
     Represents a single parcel that goes from origin hub to a specific delivery address.
@@ -26,7 +34,8 @@ class ParcelAgent(Agent):
             
             # DEBUG: Print first few parcels to understand the data
             if self.unique_id <= 10:
-                print(f"Parcel {self.unique_id}: {self.origin} → {self.destination}")
+                real_time = minutes_to_time_string(self.model.current_time)
+                print(f"Parcel {self.unique_id} at {real_time}: {self.origin} → {self.destination}")
             
             # FIXED LOGIC: Route parcels based on delivery type
             if self.origin == "External":
@@ -119,7 +128,8 @@ class RobotAgent(Agent):
 
         # Debug for first robot
         if self.unique_id == min([r.unique_id for r in self.model.robots]) and self.model.current_time % 50 == 0:
-            print(f"Time {self.model.current_time}: Robot {self.unique_id} at {hub} - State: {self.state}, Queue: {len(robot_queue)}, Distance: {self.distance_traveled:.1f}m")
+            real_time = minutes_to_time_string(self.model.current_time)
+            print(f"Time {real_time} (minute {self.model.current_time}): Robot {self.unique_id} at {hub} - State: {self.state}, Queue: {len(robot_queue)}, Distance: {self.distance_traveled:.1f}m")
 
         # CASE 1: Idle & pick up SAME-ZONE parcels only
         if self.state == "idle":
@@ -158,7 +168,8 @@ class RobotAgent(Agent):
                 self.current_edge = None
                 
                 if self.unique_id == min([r.unique_id for r in self.model.robots]):
-                    print(f"Robot {self.unique_id} picked up parcel {parcel.unique_id}, route length: {len(self.route)}")
+                    real_time = minutes_to_time_string(self.model.current_time)
+                    print(f"{real_time} - Robot {self.unique_id} picked up parcel {parcel.unique_id}, route length: {len(self.route)}")
             else:
                 # No parcels - stay idle
                 return
@@ -200,14 +211,16 @@ class RobotAgent(Agent):
                         parcel.delivery_time = self.model.current_time
                         self.state = "returning"
                         if self.unique_id == min([r.unique_id for r in self.model.robots]):
-                            print(f"Robot {self.unique_id} delivered parcel {parcel.unique_id}")
+                            real_time = minutes_to_time_string(self.model.current_time)
+                            print(f"{real_time} - Robot {self.unique_id} delivered parcel {parcel.unique_id}")
                         return
             elif self.state == "returning":
                 home_node = self.model.hub_walk_nodes[self.home_hub]
                 if self.location_node == home_node:
                     self._finish_route_and_idle()
                     if self.unique_id == min([r.unique_id for r in self.model.robots]):
-                        print(f"Robot {self.unique_id} returned home")
+                        real_time = minutes_to_time_string(self.model.current_time)
+                        print(f"{real_time} - Robot {self.unique_id} returned home")
                     return
 
 

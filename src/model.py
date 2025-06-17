@@ -7,6 +7,20 @@ from routing import shortest_path_length_time, shortest_path_route
 from demand import load_demand
 from agents import ParcelAgent, RobotAgent, CargoBikeAgent
 
+def minutes_to_time_string(minutes_since_midnight):
+    """
+    Convert minutes since midnight to HH:MM format.
+    
+    Args:
+        minutes_since_midnight: Integer minutes (e.g., 420 = 7:00 AM)
+    
+    Returns:
+        String in HH:MM format (e.g., "07:00")
+    """
+    hours = minutes_since_midnight // 60
+    minutes = minutes_since_midnight % 60
+    return f"{hours:02d}:{minutes:02d}"
+
 class CourierNetworkModel(Model):
     """
     An agent‐based model where:
