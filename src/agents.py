@@ -230,6 +230,8 @@ class CargoBikeAgent(Agent):
     1. Cross-zone deliveries (hub-to-hub transport)
     2. Class B parcels (large packages)
     3. Longer distance deliveries (1km+)
+    
+    UPDATED: Now picks up multiple parcels up to capacity for efficient batch deliveries.
     """
     def __init__(self, unique_id, model, home_hub, speed_mps, capacity):
         super().__init__(unique_id, model)
@@ -245,6 +247,8 @@ class CargoBikeAgent(Agent):
         self.current_edge_length = None
         self.current_edge = None
         self.location_index = 0
+        self.delivery_stops = []  # List of (destination_hub, parcels_for_that_hub)
+        self.current_stop_index = 0
 
     def start_next_edge(self):
         if self.location_index < len(self.route) - 1:
@@ -266,37 +270,141 @@ class CargoBikeAgent(Agent):
         self.current_edge = None
         self.current_edge_length = None
         self.edge_progress = 0.0
+        self.delivery_stops = []
+        self.current_stop_index = 0
+
+    def _plan_multi_delivery_route(self, parcels):
+        """
+        Plan an efficient route to deliver multiple parcels.
+        Groups parcels by destination and creates a route visiting each destination.
+        """
+        # Group parcels by destination hub
+        destination_groups = {}
+        for parcel in parcels:
+            dest = parcel.destination
+            if dest not in destination_groups:
+                destination_groups[dest] = []
+            destination_groups[dest].append(parcel)
+        
+        # Create delivery stops
+        self.delivery_stops = [(dest, parcels) for dest, parcels in destination_groups.items()]
+        
+        # Plan route visiting each destination hub in order, then returning home
+        home_node = self.model.hub_bike_nodes[self.home_hub]
+        route = [home_node]
+        
+        for dest_hub, _ in self.delivery_stops:
+            dest_node = self.model.hub_bike_nodes[dest_hub]
+            if dest_node != route[-1]:  # Avoid duplicate nodes
+                try:
+                    segment = shortest_path_route(self.model.G_bike, route[-1], dest_node)
+                    route.extend(segment[1:])  # Skip first node to avoid duplication
+                except:
+                    print(f"Warning: Could not route from {route[-1]} to {dest_node}")
+        
+        # Add return route to home
+        if route[-1] != home_node:
+            try:
+                return_segment = shortest_path_route(self.model.G_bike, route[-1], home_node)
+                route.extend(return_segment[1:])
+            except:
+                print(f"Warning: Could not route back to home from {route[-1]}")
+        
+        return route
 
     def step(self):
         hub = self.home_hub
         bike_queue = self.model.hub_queues[hub]["bike"]
 
-        # Idle & pick up cross-zone parcels or Class B parcels
+        # Debug for first bike
+        if self.unique_id == min([b.unique_id for b in self.model.bikes]) and self.model.current_time % 50 == 0:
+            real_time = minutes_to_time_string(self.model.current_time)
+            print(f"Time {real_time}: Bike {self.unique_id} at {hub} - State: {self.state}, Queue: {len(bike_queue)}, Load: {len(self.load)}/{self.capacity}")
+
+        # CASE 1: Idle & pick up multiple parcels up to capacity
         if self.state == "idle":
             if len(bike_queue) > 0:
-                parcel = bike_queue.popleft()
-                parcel.pickup_time = self.model.current_time
-                parcel.current_vehicle = self
+                # NEW LOGIC: Pick up multiple parcels up to capacity
+                parcels_to_pick = []
                 
-                # Use bike network for longer distances
-                origin_node = self.model.hub_bike_nodes[hub]
-                dest_node = self.model.hub_bike_nodes[parcel.destination]
+                # Collect parcels up to capacity
+                while len(bike_queue) > 0 and len(parcels_to_pick) < self.capacity:
+                    parcel = bike_queue.popleft()
+                    parcel.pickup_time = self.model.current_time
+                    parcel.current_vehicle = self
+                    parcels_to_pick.append(parcel)
                 
-                route_to = shortest_path_route(self.model.G_bike, origin_node, dest_node)
-                route_back = shortest_path_route(self.model.G_bike, dest_node, origin_node)
-                
-                self.route = route_to + route_back[1:]
-                self.state = "transit"
-                self.load = [parcel]
+                # Plan multi-delivery route
+                self.load = parcels_to_pick
+                self.route = self._plan_multi_delivery_route(parcels_to_pick)
+                self.state = "delivering"
                 self.location_index = 0
+                self.current_stop_index = 0
                 self.current_edge_length = None
                 self.edge_progress = 0.0
                 self.current_edge = None
+                
+                # Debug output
+                if self.unique_id == min([b.unique_id for b in self.model.bikes]):
+                    real_time = minutes_to_time_string(self.model.current_time)
+                    destinations = [p.destination for p in parcels_to_pick]
+                    print(f"{real_time} - Bike {self.unique_id} picked up {len(parcels_to_pick)} parcels to: {destinations}")
             else:
                 return
 
-        # Transit or returning
-        if self.state in ["transit", "returning"]:
+        # CASE 2: Delivering to multiple destinations
+        if self.state == "delivering":
+            if self.current_edge_length is None:
+                self.start_next_edge()
+                if self.current_edge_length is None:
+                    # Route finished, switch to returning
+                    self.state = "returning"
+                    return
+            
+            dt_seconds = 60
+            max_distance_this_step = self.speed_mps * dt_seconds
+            dist_to_finish = self.current_edge_length - self.edge_progress
+            move_dist = min(max_distance_this_step, dist_to_finish)
+            
+            if move_dist > 0:
+                self.edge_progress += move_dist
+                self.distance_traveled += move_dist
+                
+            if move_dist < dist_to_finish:
+                return
+
+            # Edge finished - check if we're at a delivery destination
+            curr_node, next_node = self.current_edge
+            self.location_node = next_node
+            self.location_index += 1
+            self.edge_progress = 0.0
+            self.current_edge_length = None
+            self.current_edge = None
+
+            # Check if we've reached any delivery destination
+            for dest_hub, parcels_for_dest in self.delivery_stops:
+                dest_node = self.model.hub_bike_nodes[dest_hub]
+                if self.location_node == dest_node:
+                    # Deliver all parcels for this destination
+                    for parcel in parcels_for_dest:
+                        if parcel in self.load:
+                            parcel.delivery_time = self.model.current_time
+                            self.load.remove(parcel)
+                    
+                    # Remove this stop from our list
+                    self.delivery_stops = [(d, p) for d, p in self.delivery_stops if d != dest_hub]
+                    
+                    if self.unique_id == min([b.unique_id for b in self.model.bikes]):
+                        real_time = minutes_to_time_string(self.model.current_time)
+                        print(f"{real_time} - Bike {self.unique_id} delivered {len(parcels_for_dest)} parcels at {dest_hub}")
+                    break
+
+            # If all deliveries complete, head home
+            if not self.load:
+                self.state = "returning"
+
+        # CASE 3: Returning home
+        elif self.state == "returning":
             if self.current_edge_length is None:
                 self.start_next_edge()
                 if self.current_edge_length is None:
@@ -323,15 +431,11 @@ class CargoBikeAgent(Agent):
             self.current_edge_length = None
             self.current_edge = None
 
-            if self.state == "transit":
-                dest_node = self.model.hub_bike_nodes[self.load[0].destination]
-                if self.location_node == dest_node:
-                    parcel = self.load.pop(0)
-                    parcel.delivery_time = self.model.current_time
-                    self.state = "returning"
-                    return
-            elif self.state == "returning":
-                home_node = self.model.hub_bike_nodes[self.home_hub]
-                if self.location_node == home_node:
-                    self._finish_route_and_idle()
-                    return
+            # Check if we're home
+            home_node = self.model.hub_bike_nodes[self.home_hub]
+            if self.location_node == home_node:
+                self._finish_route_and_idle()
+                if self.unique_id == min([b.unique_id for b in self.model.bikes]):
+                    real_time = minutes_to_time_string(self.model.current_time)
+                    print(f"{real_time} - Bike {self.unique_id} returned home")
+                return

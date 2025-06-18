@@ -41,9 +41,15 @@ def main():
     for _ in range(args.steps):
         model.step()
     
-    # 9.6 Collect and save metrics
+    # 9.6 Collect and save metrics - FIXED PATH HANDLING
     df_metrics = model.datacollector.get_model_vars_dataframe()
-    os.makedirs(os.path.dirname(args.output), exist_ok=True)
+    
+    # Ensure the output directory exists
+    output_dir = os.path.dirname(args.output)
+    if output_dir and not os.path.exists(output_dir):
+        os.makedirs(output_dir, exist_ok=True)
+    
+    # Save the CSV file (not directory)
     df_metrics.to_csv(args.output)
     print(f"Simulation complete. Metrics saved to {args.output}")
 

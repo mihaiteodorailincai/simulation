@@ -9,15 +9,15 @@ def get_demand_multiplier(current_time_minutes):
     Get the demand multiplier for a given time of day.
     """
     demand_patterns = {
-        "night_early": {"start": 0, "end": 360, "multiplier": 0.2},
-        "morning_quiet": {"start": 360, "end": 480, "multiplier": 0.4},
-        "morning_peak": {"start": 480, "end": 600, "multiplier": 1.8},
-        "mid_morning": {"start": 600, "end": 720, "multiplier": 1.2},
-        "lunch_peak": {"start": 720, "end": 780, "multiplier": 1.6},
-        "afternoon": {"start": 780, "end": 1020, "multiplier": 1.0},
-        "evening_peak": {"start": 1020, "end": 1140, "multiplier": 1.5},
-        "evening": {"start": 1140, "end": 1320, "multiplier": 0.8},
-        "night_late": {"start": 1320, "end": 1440, "multiplier": 0.3}
+        "night_early": {"start": 0, "end": 360, "multiplier": 0.3},        # Increased from 0.2
+        "morning_quiet": {"start": 360, "end": 480, "multiplier": 0.6},    # Increased from 0.4
+        "morning_peak": {"start": 480, "end": 600, "multiplier": 1.4},     # Reduced from 1.8
+        "mid_morning": {"start": 600, "end": 720, "multiplier": 1.1},      # Reduced from 1.2
+        "lunch_peak": {"start": 720, "end": 780, "multiplier": 1.3},       # Reduced from 1.6
+        "afternoon": {"start": 780, "end": 1020, "multiplier": 1.0},       # Same (baseline)
+        "evening_peak": {"start": 1020, "end": 1140, "multiplier": 1.2},   # Reduced from 1.5
+        "evening": {"start": 1140, "end": 1320, "multiplier": 0.9},        # Increased from 0.8
+        "night_late": {"start": 1320, "end": 1440, "multiplier": 0.4}      # Increased from 0.3
     }
     
     for period_name, period_data in demand_patterns.items():
@@ -148,9 +148,9 @@ def generate_realistic_demand_with_peaks(G_walk, hub_nodes_df, output_path="../d
     
     # 2. Base demand parameters - THESE WILL BE EXACT COUNTS
     daily_volumes = {
-        "Centrum": 275,
-        "Blixembosch": 165,
-        "Meerhoven": 110
+        "Centrum": 200,      
+        "Blixembosch": 140,  
+        "Meerhoven": 160
     }
     
     # Calculate expected total
@@ -159,12 +159,12 @@ def generate_realistic_demand_with_peaks(G_walk, hub_nodes_df, output_path="../d
     print(f"DEMAND GENERATION TARGET: {expected_total} parcels")
     print(f"{'='*60}")
     
-    within_pct = 0.80   # 70% same zone
-    cross_pct = 0.15    # 20% cross zone  
-    external_pct = 0.05 # 10% external
+    within_pct = 0.65   # 70% same zone
+    cross_pct = 0.20    # 20% cross zone  
+    external_pct = 0.15 # 10% external
     
-    classA_pct = 0.80   # 80% Class A (robots)
-    classB_pct = 0.20   # 20% Class B (bikes)
+    classA_pct = 0.65   # 80% Class A (robots)
+    classB_pct = 0.35   # 20% Class B (bikes)
     
     # 3. Time windows - used for reporting, not filtering
     time_windows = [
